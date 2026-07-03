@@ -118,7 +118,9 @@ The agent eliminates noise **mathematically before any LLM sees the data**, usin
 
 The multi-agent triage system is built as a structured Google ADK workflow graph, orchestrating specialized reasoning nodes:
 
-![ADK Workflow Graph](assets/adk_graph.png)
+<p align="center">
+  <img src="assets/adk_graph.png" alt="ADK Workflow Graph" width="450">
+</p>
 
 ### Pipeline Phases
 
@@ -289,7 +291,9 @@ The dashboard provides:
 - Hash-chained provenance audit trail viewer
 - Raw artifact evidence panel per finding
 
-![Interactive Anomaly Visualizer Dashboard](assets/dashboard.png)
+<p align="center">
+  <img src="assets/dashboard.png" alt="Interactive Anomaly Visualizer Dashboard" width="850">
+</p>
 
 > **Alternative — ADK development UI:**  
 > `uv run adk web` starts the standard Google ADK chat interface at `http://localhost:8000`.  
