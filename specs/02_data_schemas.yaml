@@ -1,0 +1,205 @@
+system:
+  name: "Autonomous DFIR Agent"
+  version: "3.0.0"
+  track: "Agents for Business"
+  integrations:
+    - type: mcp_server
+      name: triage_engine
+      description: "V3 Hybrid NLP triage pipeline — Frequency Stacking → NLP Embeddings → Isolation Forest → SIGMA Enrichment"
+      dependencies:
+        - scikit-learn  # Isolation Forest
+        - google-genai  # Vertex AI text-embedding-004
+        - scikit-learn  # Isolation Forest and TF-IDF fallback
+        - pyyaml  # SIGMA rule parsing
+      tools:
+        - read_evidence_manifest
+        - run_frequency_filter
+        - run_anomaly_detection
+        - upload_to_context_cache
+        - search_sigma_rules
+    - type: agent_engine
+      name: orchestrator
+      model: gemini-2.5-pro
+    - type: agent_engine
+      name: log_analyst
+      model: gemini-2.5-pro
+    - type: agent_engine
+      name: validator
+      model: gemini-2.5-flash
+
+# ------------------------------------------------------------------
+# INPUT SCHEMA
+# ------------------------------------------------------------------
+
+data_formats:
+  evidence_input_csv:
+    description: "Plaso log2timeline Super Timeline CSV (MFT, Registry, Windows Events, Prefetch)."
+    columns:
+      - name: datetime
+        type: string
+        format: "ISO 8601"
+      - name: source
+        type: string
+      - name: sourcetype
+        type: string
+      - name: message
+        type: string
+      - name: user
+        type: string
+
+# ------------------------------------------------------------------
+# TOOL OUTPUT SCHEMAS (MCP Server Responses)
+# ------------------------------------------------------------------
+
+  evidence_manifest:
+    description: "Output of read_evidence_manifest tool."
+    schema:
+      - field: file_path
+        type: string
+      - field: sha256_hash
+        type: string
+      - field: row_count
+        type: integer
+      - field: columns
+        type: list[string]
+      - field: tool_execution_id
+        type: string
+
+  frequency_filter_output:
+    description: "Output of run_frequency_filter tool (Phase 1 — Stacking)."
+    schema:
+      - field: message_normalized
+        type: string
+        description: "Lowercased, GUIDs/temp paths stripped."
+      - field: message_original
+        type: string
+      - field: frequency_count
+        type: integer
+      - field: is_filtered
+        type: boolean
+        description: "true if frequency_count > threshold (dropped as known-good noise)."
+      - field: original_log_id
+        type: string
+      - field: tool_execution_id
+        type: string
+    summary_fields:
+      - field: total_commands
+        type: integer
+      - field: filtered_count
+        type: integer
+      - field: long_tail_count
+        type: integer
+      - field: unique_normalized_forms
+        type: integer
+      - field: frequency_threshold_used
+        type: integer
+
+  anomaly_detection_output:
+    description: "Output of run_anomaly_detection tool (Phase 2 — NLP Embeddings + Isolation Forest)."
+    schema:
+      - field: original_log_id
+        type: string
+      - field: message
+        type: string
+      - field: anomaly_score
+        type: float
+        description: "Isolation Forest score. Range -1 to 0. More negative = more anomalous."
+      - field: embedding_model_used
+        type: string
+        description: "Either 'text-embedding-004' or 'tfidf-fallback'."
+      - field: embedding_hash
+        type: string
+        description: "SHA-256 of the embedding vector for reproducibility."
+      - field: tool_execution_id
+        type: string
+
+  sigma_match:
+    description: "Output of search_sigma_rules tool (Phase 3 — SIGMA Enrichment)."
+    schema:
+      - field: original_log_id
+        type: string
+      - field: message
+        type: string
+      - field: sigma_rule_id
+        type: string
+      - field: sigma_rule_name
+        type: string
+      - field: mitre_tactic
+        type: string
+      - field: mitre_technique_id
+        type: string
+      - field: sigma_severity
+        type: string
+        enum: [low, medium, high, critical]
+      - field: tool_execution_id
+        type: string
+
+  context_cache_output:
+    description: "Output of upload_to_context_cache tool."
+    schema:
+      - field: cache_name
+        type: string
+        description: "Gemini File API cache reference URI to pass to agents."
+      - field: file_uri
+        type: string
+      - field: tool_execution_id
+        type: string
+
+# ------------------------------------------------------------------
+# AGENT OUTPUT SCHEMAS
+# ------------------------------------------------------------------
+
+  analysis_output:
+    description: "Log Analyst Agent output — one entry per analyzed anomaly."
+    schema:
+      - field: original_log_id
+        type: string
+      - field: message
+        type: string
+      - field: anomaly_score
+        type: float
+      - field: risk_score
+        type: integer
+        description: "1-100, assigned by Log Analyst."
+      - field: confidence_score
+        type: string
+        enum: [HIGH, MEDIUM, LOW]
+        description: "Analyst's confidence in the assessment."
+      - field: mitre_tactic
+        type: string
+      - field: mitre_technique_id
+        type: string
+      - field: sigma_rule_id
+        type: string
+        nullable: true
+        description: "From SIGMA tool if matched, null if analyst-inferred."
+      - field: analyst_rationale
+        type: string
+        description: "Evidence-based explanation citing only provided logs."
+      - field: false_positive_flag
+        type: boolean
+      - field: tool_execution_id
+        type: string
+
+# ------------------------------------------------------------------
+# PROVENANCE SCHEMA (Sequential Audit Trail)
+# ------------------------------------------------------------------
+
+  provenance_log_entry:
+    description: "Single entry in provenance.jsonl — sequential logging for offline verification."
+    schema:
+      - field: event_type
+        type: string
+        enum: [tool_call, agent_output, validation_pass, validation_fail, finding_dropped, retry_requested]
+      - field: timestamp
+        type: string
+        format: "ISO 8601"
+      - field: agent_id
+        type: string
+        description: "orchestrator | log_analyst | validator | triage_engine"
+      - field: tool_execution_id
+        type: string
+      - field: details
+        type: string
+        nullable: true
+        description: "Human-readable note (e.g., 'Finding dropped: no matching tool_execution_id')."

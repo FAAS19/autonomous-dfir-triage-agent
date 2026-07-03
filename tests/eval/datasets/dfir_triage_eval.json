@@ -1,0 +1,20 @@
+{
+  "eval_set_id": "dfir_triage_eval_set",
+  "eval_cases": [
+    {
+      "eval_id": "eval-dfir-003",
+      "conversation": [
+        {
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "User 'Mr. Evil' logged in via RDP at 3am. Is there lateral movement? Search the supertimeline and score the findings."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIND EVIL! — Autonomous DFIR Triage Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #070c15;
+            --bg-glass: rgba(13, 22, 38, 0.7);
+            --border-glass: rgba(0, 230, 118, 0.15);
+            --border-glow: rgba(0, 230, 118, 0.4);
+            --primary: #00e676;
+            --primary-glow: rgba(0, 230, 118, 0.3);
+            --text-main: #e0e6ed;
+            --text-muted: #8b9bb4;
+            --critical: #ff1744;
+            --high: #ff9100;
+            --medium: #ffea00;
+            --low: #00b0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(0, 230, 118, 0.05) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(0, 176, 255, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(7, 12, 21, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-glass);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-glass);
+            backdrop-filter: blur(10px);
+            background: rgba(7, 12, 21, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-shield {
+            width: 32px;
+            height: 32px;
+            fill: var(--primary);
+            filter: drop-shadow(0 0 8px var(--primary-glow));
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, #00e676, #00b0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(0, 230, 118, 0.2));
+        }
+
+        .tagline {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .status-badge {
+            background: rgba(0, 230, 118, 0.1);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px var(--primary); }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .panel {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .panel:hover {
+            border-color: rgba(0, 230, 118, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 230, 118, 0.05);
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary);
+            border-left: 3px solid var(--primary);
+            padding-left: 10px;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Control Panel Form */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        input[type="text"] {
+            background: rgba(7, 12, 21, 0.6);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), #00b0ff);
+            color: #000;
+            border: none;
+            padding: 1rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 230, 118, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: rgba(139, 155, 180, 0.2);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Terminal Logs Container */
+        .terminal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 250px;
+        }
+
+        .terminal-screen {
+            background: rgba(3, 7, 15, 0.9);
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #00ff66;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+            max-height: 400px;
+        }
+
+        .terminal-line {
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .terminal-line.info { color: var(--text-muted); }
+        .terminal-line.success { color: var(--primary); }
+        .terminal-line.error { color: var(--critical); }
+        .terminal-line.agent { color: #00b0ff; }
+
+        /* Main Workspace */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Timeline heatmap */
+        .timeline-wrapper {
+            position: relative;
+        }
+
+        .timeline-track {
+            height: 120px;
+            background: rgba(7, 12, 21, 0.4);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+            position: relative;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            overflow-x: auto;
+        }
+
+        .timeline-events-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            min-width: 800px;
+        }
+
+        .timeline-event {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid var(--bg-dark);
+            z-index: 10;
+        }
+
+        .timeline-event::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .timeline-event:hover {
+            transform: scale(1.4);
+            z-index: 20;
+        }
+
+        .timeline-event:hover::before {
+            border-color: inherit;
+            box-shadow: 0 0 10px inherit;
+        }
+
+        .timeline-event.critical { background: var(--critical); border-color: var(--critical); }
+        .timeline-event.high { background: var(--high); border-color: var(--high); }
+        .timeline-event.medium { background: var(--medium); border-color: var(--medium); }
+        .timeline-event.low { background: var(--low); border-color: var(--low); }
+
+        .timeline-event-label {
+            position: absolute;
+            bottom: -32px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            pointer-events: none;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .timeline-event.active {
+            box-shadow: 0 0 15px currentColor;
+            transform: scale(1.5);
+        }
+
+        /* Detail Workspace columns */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        /* Finding Card styling */
+        .finding-card {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .finding-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--border-glass);
+            padding-bottom: 1rem;
+        }
+
+        .finding-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .finding-meta-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 5px;
+        }
+
+        .pill {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .pill.severity {
+            background: rgba(255, 23, 68, 0.15);
+            border: 1px solid var(--critical);
+            color: var(--critical);
+        }
+        .pill.confidence {
+            background: rgba(0, 176, 255, 0.15);
+            border: 1px solid var(--low);
+            color: var(--low);
+        }
+        .pill.tactic {
+            background: rgba(0, 230, 118, 0.15);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .finding-detail-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .finding-detail-label {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .finding-detail-value {
+            font-family: 'Fira Code', monospace;
+            word-break: break-all;
+        }
+
+        .finding-box {
+            background: rgba(3, 7, 15, 0.5);
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #ff9100;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .finding-rationale {
+            background: rgba(0, 230, 118, 0.05);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* MITRE Grid & Audit Logs */
+        .mitre-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .mitre-cell {
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.8rem;
+            background: rgba(7, 12, 21, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .mitre-cell.active {
+            border-color: var(--primary);
+            background: rgba(0, 230, 118, 0.05);
+            box-shadow: 0 0 10px rgba(0, 230, 118, 0.1);
+        }
+
+        .mitre-tactic-name {
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .mitre-tech-id {
+            font-family: 'Fira Code', monospace;
+            color: var(--text-muted);
+        }
+
+        /* Audit Logs List */
+        .audit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .audit-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            background: rgba(7, 12, 21, 0.4);
+        }
+
+        .audit-check {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 900;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        .audit-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .audit-tool {
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .audit-id {
+            font-family: 'Fira Code', monospace;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .audit-time {
+            color: var(--text-muted);
+        }
+
+        /* Direct Answer component */
+        .direct-answer-container {
+            background: rgba(0, 176, 255, 0.05);
+            border: 1px solid rgba(0, 176, 255, 0.2);
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 176, 255, 0.05);
+        }
+
+        .direct-answer-header {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #00b0ff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .direct-answer-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <svg class="logo-shield" viewBox="0 0 24 24">
+                <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 10.99H6V6.17l6-2.25v9.07z"/>
+            </svg>
+            <div>
+                <h1>FIND EVIL!</h1>
+                <div class="tagline">Autonomous Incident Triage Agent</div>
+            </div>
+        </div>
+        <div class="status-badge" id="system-status">
+            <div class="status-dot"></div>
+            <span>Triage Ready</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Control Center & Terminal logs -->
+        <div class="panel">
+            <div class="panel-title">Triage Operations</div>
+            
+
+            <div class="form-group">
+                <label for="user-prompt">Analysis Query</label>
+                <input type="text" id="user-prompt" value="User 'Mr. Evil' logged in via RDP at 3am. Is there lateral movement? Search the supertimeline and score the findings.">
+            </div>
+
+            <button class="btn" id="run-triage-btn" onclick="startPipeline()">Run Triage Pipeline</button>
+            
+            <div class="terminal-container">
+                <label>Real-Time Agent Stream</label>
+                <div class="terminal-screen" id="terminal">
+                    <div class="terminal-line info">System initialized. Waiting for pipeline execution command...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytical workspace -->
+        <div class="workspace">
+            <!-- Direct Answer from Agent -->
+            <div class="direct-answer-container" id="direct-answer-box" style="display: none;">
+                <div class="direct-answer-header">
+                    <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                    <span>Direct Query Response</span>
+                </div>
+                <div class="direct-answer-text" id="direct-answer-txt">No active query findings loaded.</div>
+            </div>
+
+            <!-- Heatmap / Timeline -->
+            <div class="panel">
+                <div class="panel-title">Interactive Anomaly Timeline</div>
+                <div class="timeline-track">
+                    <div class="timeline-events-container" id="timeline-events">
+                        <!-- Events loaded dynamically -->
+                        <span class="tagline" style="color:var(--text-muted);width:100%;text-align:center">Run the pipeline or trigger findings fetch to populate the visual timeline</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-grid">
+                <!-- Anomaly Focus details -->
+                <div class="panel">
+                    <div class="panel-title">Anomaly Focus Details</div>
+                    <div class="finding-card" id="finding-focus" style="justify-content: center; align-items: center; min-height: 250px;">
+                        <span class="tagline" style="color:var(--text-muted)">Select an event from the timeline track above to focus detailed metrics</span>
+                    </div>
+                </div>
+
+                <!-- Tactic Matrix & Provenance Audit -->
+                <div class="panel" style="gap:1rem;">
+                    <div class="panel-title">Triage Verification & MITRE Mapping</div>
+                    
+                    <label>MITRE ATT&CK Mapping</label>
+                    <div class="mitre-grid" id="mitre-matrix">
+                        <div class="mitre-cell">
+                            <span class="mitre-tactic-name">Initial Access</span>
+                            <span class="mitre-tech-id">T1189</span>
+                        </div>
+                        <div class="mitre-cell">
+                            <span class="mitre-tactic-name">Defense Evasion</span>
+                            <span class="mitre-tech-id">T1027</span>
+                        </div>
+                        <div class="mitre-cell">
+                            <span class="mitre-tactic-name">Command & Control</span>
+                            <span class="mitre-tech-id">T1071.001</span>
+                        </div>
+                    </div>
+
+                    <label style="margin-top: 10px;">Blockchain-Like Provenance Log</label>
+                    <div class="audit-list" id="provenance-audit">
+                        <!-- Audit trails loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Load initial findings on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchFindings();
+        });
+
+        async function fetchFindings() {
+            try {
+                const response = await fetch('/api/findings');
+                const data = await response.json();
+                
+                if (data.findings && data.findings.length > 0) {
+                    renderTimeline(data.findings);
+                    renderProvenance(data.provenance);
+                    renderMITRE(data.findings);
+                    
+                    // Render Direct Answer if present in markdown
+                    parseDirectAnswer(data.report_markdown);
+                }
+            } catch (err) {
+                console.error("Error fetching findings", err);
+            }
+        }
+
+        function parseDirectAnswer(md) {
+            if (!md) return;
+            const marker = "### Direct Answer to User Query";
+            const index = md.indexOf(marker);
+            if (index !== -1) {
+                const afterMarker = md.substring(index + marker.length).trim();
+                const nextHeaderIdx = afterMarker.indexOf("## ");
+                const answerText = nextHeaderIdx !== -1 ? afterMarker.substring(0, nextHeaderIdx).trim() : afterMarker.trim();
+                
+                document.getElementById('direct-answer-txt').innerText = answerText.replace(/\*\*/g, "");
+                document.getElementById('direct-answer-box').style.display = 'flex';
+            }
+        }
+
+        function renderTimeline(findings) {
+            const container = document.getElementById('timeline-events');
+            container.innerHTML = '';
+            
+            // Sort findings chronologically
+            findings.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            
+            findings.forEach((f, idx) => {
+                const score = parseFloat(f.score);
+                let severityClass = 'low';
+                if (parseFloat(f.risk_score || "0") >= 75 || score < -10.083) {
+                    severityClass = 'critical';
+                } else if (parseFloat(f.risk_score || "0") >= 50 || score < -10.081) {
+                    severityClass = 'high';
+                } else if (parseFloat(f.risk_score || "0") >= 25) {
+                    severityClass = 'medium';
+                }
+                
+                const dot = document.createElement('div');
+                dot.className = `timeline-event ${severityClass}`;
+                dot.onclick = () => focusFinding(f, dot);
+                
+                const label = document.createElement('div');
+                label.className = 'timeline-event-label';
+                let shortDate = 'Unknown';
+                if (f.ts && !f.ts.includes('00/00/0000')) {
+                    shortDate = f.ts.split(' ')[0];
+                }
+                label.innerText = shortDate;
+                
+                dot.appendChild(label);
+                container.appendChild(dot);
+                
+                // Focus first item initially
+                if (idx === 0) {
+                    focusFinding(f, dot);
+                }
+            });
+        }
+
+        function focusFinding(f, element) {
+            // Remove active classes
+            document.querySelectorAll('.timeline-event').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+            
+            const card = document.getElementById('finding-focus');
+            
+            const scoreNum = parseFloat(f.score).toFixed(4);
+            const severityColor = getSeverityColor(f.severity || 'low');
+            
+            let displayTs = f.ts + ' UTC';
+            if (!f.ts || f.ts.includes('00/00/0000')) {
+                displayTs = 'Unknown (Artifact lacks timestamp)';
+            }
+            
+            card.innerHTML = `
+                <div class="finding-header">
+                    <div>
+                        <div class="finding-title">Technique ${f.tech} — ${f.sourcetype}</div>
+                        <div class="finding-meta-pills">
+                            <span class="pill severity" style="border-color:${severityColor}; color:${severityColor}; background:rgba(0,0,0,0.1);">${f.severity || 'HIGH'}</span>
+                            <span class="pill confidence">${f.confidence || 'MEDIUM'}</span>
+                            <span class="pill tactic">${f.tech.startsWith('T1105') || f.tech.startsWith('T1071') ? 'Command & Control' : 'Defense Evasion'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="finding-detail-row">
+                    <div class="finding-detail-label">Timestamp</div>
+                    <div class="finding-detail-value">${displayTs}</div>
+                </div>
+
+                <div class="finding-detail-row">
+                    <div class="finding-detail-label">Affected Host</div>
+                    <div class="finding-detail-value">${f.host || 'unknown'}</div>
+                </div>
+
+                <div class="finding-detail-row">
+                    <div class="finding-detail-label">User context</div>
+                    <div class="finding-detail-value">${f.user || 'unknown'}</div>
+                </div>
+
+                <div class="finding-detail-row">
+                    <div class="finding-detail-label">Anomaly ID</div>
+                    <div class="finding-detail-value">Log ID ${f.log_id} (IF score: ${scoreNum})</div>
+                </div>
+
+                <div class="finding-detail-row">
+                    <div class="finding-detail-label">Detection Rule</div>
+                    <div class="finding-detail-value" style="color:var(--primary);">${f.rule || 'N/A'}</div>
+                </div>
+
+                <label>Evidence Log Segment</label>
+                <div class="finding-box">${f.raw}</div>
+
+                <label>Forensic Rationale</label>
+                <div class="finding-rationale">${f.rationale}</div>
+            `;
+        }
+
+        function getSeverityColor(sev) {
+            switch(sev.toLowerCase()) {
+                case 'critical': return 'var(--critical)';
+                case 'high': return 'var(--high)';
+                case 'medium': return 'var(--medium)';
+                default: return 'var(--low)';
+            }
+        }
+
+        function renderProvenance(auditLogs) {
+            const list = document.getElementById('provenance-audit');
+            list.innerHTML = '';
+            
+            if (!auditLogs || auditLogs.length === 0) {
+                list.innerHTML = '<span class="tagline" style="color:var(--text-muted)">No provenance verification logs found.</span>';
+                return;
+            }
+            
+            // Render latest logs first
+            auditLogs.reverse().forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'audit-item';
+                
+                const check = document.createElement('div');
+                check.className = 'audit-check';
+                check.innerText = '✓';
+                
+                const info = document.createElement('div');
+                info.className = 'audit-info';
+                
+                let tool = log.event_type;
+                if (log.details && log.details.tool) {
+                    tool = log.details.tool;
+                }
+                
+                info.innerHTML = `
+                    <span class="audit-tool">${tool}</span>
+                    <span class="audit-id">${log.tool_execution_id || 'System Event'}</span>
+                `;
+                
+                const time = document.createElement('span');
+                time.className = 'audit-time';
+                // Shorten ISO timestamp
+                time.innerText = new Date(log.timestamp).toLocaleTimeString();
+                
+                item.appendChild(check);
+                item.appendChild(info);
+                item.appendChild(time);
+                list.appendChild(item);
+            });
+        }
+
+        function renderMITRE(findings) {
+            // Reset active classes
+            document.querySelectorAll('.mitre-cell').forEach(cell => cell.classList.remove('active'));
+            
+            findings.forEach(f => {
+                const id = f.tech;
+                document.querySelectorAll('.mitre-cell').forEach(cell => {
+                    const techId = cell.querySelector('.mitre-tech-id').innerText;
+                    if (id.startsWith(techId)) {
+                        cell.classList.add('active');
+                    }
+                });
+            });
+        }
+
+        // SSE Pipeline Execution streaming
+        async function startPipeline() {
+            const runBtn = document.getElementById('run-triage-btn');
+            const term = document.getElementById('terminal');
+            const status = document.getElementById('system-status');
+            
+            runBtn.disabled = true;
+            term.innerHTML = '<div class="terminal-line success">Starting triage pipeline...</div>';
+            status.innerHTML = '<div class="status-dot" style="background:var(--high)"></div><span>Pipeline running</span>';
+            
+
+            const prompt = document.getElementById('user-prompt').value;
+            
+            try {
+                // 1. Create a new session via ADK REST API
+                const appName = 'app';
+                const userId = 'default_user';
+                const sessionRes = await fetch(`/apps/${appName}/users/${userId}/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (!sessionRes.ok) {
+                    throw new Error("Failed to create session " + sessionRes.status);
+                }
+                const sessionData = await sessionRes.json();
+                const sessionId = sessionData.id;
+
+                // 2. Call the run_sse endpoint with the created sessionId
+                const response = await fetch('/run_sse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        appName: appName,
+                        userId: userId,
+                        sessionId: sessionId,
+                        newMessage: { role: 'user', parts: [{ text: prompt }] },
+                        streaming: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value);
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep partial line in buffer
+
+                    for (const line of lines) {
+                        const cleanLine = line.trim();
+                        if (cleanLine.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(cleanLine.substring(6));
+                                handlePipelineEvent(data);
+                            } catch (e) {
+                                // Skip parsing error for non-json
+                            }
+                        }
+                    }
+                }
+                
+                term.appendChild(document.createElement('div')).className = 'terminal-line success';
+                term.lastChild.innerText = 'Pipeline Complete. Updating dashboard elements...';
+                
+                status.innerHTML = '<div class="status-dot"></div><span>Triage Complete</span>';
+                runBtn.disabled = false;
+                
+                // Fetch the newly updated findings
+                await fetchFindings();
+
+            } catch (err) {
+                term.appendChild(document.createElement('div')).className = 'terminal-line error';
+                term.lastChild.innerText = 'Error running pipeline: ' + err.message;
+                status.innerHTML = '<div class="status-dot" style="background:var(--critical)"></div><span>Triage Failed</span>';
+                runBtn.disabled = false;
+            }
+        }
+
+        function handlePipelineEvent(event) {
+            const term = document.getElementById('terminal');
+            
+            // If the event has node names or final parts, print them
+            let text = "";
+            let cssClass = "info";
+            
+            if (event.content && event.content.parts) {
+                text = event.content.parts[0].text || "";
+                cssClass = "agent";
+            } else if (event.node) {
+                text = `[Node: ${event.node.name}] completed.`;
+                cssClass = "success";
+            }
+            
+            if (text) {
+                const line = document.createElement('div');
+                line.className = `terminal-line ${cssClass}`;
+                line.innerText = text;
+                term.appendChild(line);
+                term.scrollTop = term.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>

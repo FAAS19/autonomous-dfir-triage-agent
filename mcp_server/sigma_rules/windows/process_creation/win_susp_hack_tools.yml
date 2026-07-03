@@ -1,0 +1,22 @@
+title: Suspicious Hacking and Forensic Tools Execution
+id: c5d6706e-8b1e-450f-90e8-0726b2707530
+status: experimental
+description: Detects the installation or execution of suspicious forensic and hacking tools like Cain & Abel, Ethereal, NetStumbler, Look@LAN, FaberToys, etc.
+author: DFIR Triage Agent
+tags:
+  - attack.t1588.002
+  - attack.resource-development
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    - desc|contains: 'cain'
+    - desc|contains: 'ethereal'
+    - desc|contains: 'netstumbler'
+    - desc|contains: 'look@lan'
+    - desc|contains: 'fabertoys'
+    - desc|contains: 'cuteftp'
+    - desc|contains: '123wasp'
+  condition: selection
+level: high

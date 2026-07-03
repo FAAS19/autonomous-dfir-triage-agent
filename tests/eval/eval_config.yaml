@@ -1,0 +1,68 @@
+metrics_to_run:
+  - custom_response_quality
+  - dfir_grounding_metric
+  - mitre_accuracy_metric
+  - multi_turn_tool_use_quality
+
+custom_metrics:
+  - name: custom_response_quality
+    prompt_template: |
+      You are an expert quality assurance evaluator for an enterprise AI assistant. Your task is to evaluate the agent's final response given the user prompt and the full agent trace (for tool-call and reasoning context).
+
+      Please grade the response quality on a scale of 1 to 5 according to the following criteria:
+      1 (Poor): The response fails to address the query, contains incorrect information, or is highly confusing.
+      2 (Below Average): The response partially addresses the query but has notable inaccuracies, gaps, or unclear structure.
+      3 (Acceptable): The response adequately answers the query but lacks depth, clear structure, or misses minor details.
+      4 (Good): The response is accurate, well-structured, and covers the query thoroughly with minor room for improvement.
+      5 (Excellent): The response is highly relevant, comprehensive, flawlessly accurate, and excellently structured.
+
+      ### Target Evaluation:
+      User Prompt: {prompt}
+      Final Response: {response}
+      Full Agent Trace: {agent_data}
+
+      Return your evaluation as a valid JSON object matching this structure:
+      {{
+        "score": <integer between 1 and 5>,
+        "explanation": "<detailed string explaining the rationale for the score assigned>"
+      }}
+
+  - name: dfir_grounding_metric
+    prompt_template: |
+      You are an expert DFIR forensic auditor. Your task is to evaluate the grounding of the analyst's findings in the final response.
+      A finding is grounded ONLY if the analyst's rationale and evidence cite verbatim strings (IPs, filenames, usernames, accounts, command line parameters) present in the raw log message.
+      If the analyst references details NOT found in the raw log message, it is a hallucination.
+
+      Crucial: The agent trace ({agent_data}) contains instructions and metadata (like matched SIGMA rule titles). Do NOT penalize the agent for these rule titles existing in the trace. Only penalize the agent if it fabricates or claims rule details exist in the raw log message within its actual final response rationale.
+
+      Grade on a scale of 1 to 5:
+      1 (Hallucinated): High number of fabricated entities or claims in the final response.
+      5 (Fully Grounded): Zero fabricated entities or claims in the final response; strictly cites only verbatim evidence.
+
+      ### Target Evaluation:
+      Final Response: {response}
+      Full Agent Trace: {agent_data}
+
+      Return your evaluation as a valid JSON object:
+      {{
+        "score": <integer between 1 and 5>,
+        "explanation": "<detailed rationale for the score>"
+      }}
+
+  - name: mitre_accuracy_metric
+    prompt_template: |
+      You are a MITRE ATT&CK framework mapping expert. Your task is to check if the mapping of the identified commands and logs to the MITRE Tactic and Technique ID is accurate.
+
+      Grade on a scale of 1 to 5:
+      1 (Incorrect): Mappings are completely wrong or missing.
+      5 (Highly Accurate): All tactics and techniques are mapped correctly, and are supported by the raw logs or SIGMA rules.
+
+      ### Target Evaluation:
+      Final Response: {response}
+      Full Agent Trace: {agent_data}
+
+      Return your evaluation as a valid JSON object:
+      {{
+        "score": <integer between 1 and 5>,
+        "explanation": "<detailed mapping accuracy assessment>"
+      }}
