@@ -9,6 +9,10 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-D22128?style=for-the-badge)](LICENSE)
 
+<br><br>
+<img src="assets/cover.png" alt="Autonomous DFIR Triage Agent Banner" width="800">
+<br><br>
+
 **A production-grade, multi-agent Digital Forensics & Incident Response (DFIR) system that reduces forensic triage time from days to under two minutes.**
 
 *Submitted to the [5-Day AI Agents: Intensive Vibe Coding Course with Google](https://www.kaggle.com/competitions/5-day-ai-agents-intensive-vibecoding-course-with-google/overview) — Kaggle × Google, June 2026*
