@@ -212,7 +212,6 @@ autonomous-dfir-triage-agent/
 │
 ├── tests/                          # Test suite
 │   ├── integration/                # End-to-end pipeline and server tests
-│   ├── unit/                       # Unit tests
 │   └── eval/                       # ADK evaluation datasets and runner
 │
 ├── .env.example                    # API key template — copy to .env
@@ -255,7 +254,12 @@ This project demonstrates all required concepts from the *5-Day AI Agents Intens
 
 **1. Clone the repository**
 ```bash
+# Linux / macOS
 git clone https://github.com/FAAS19/autonomous-dfir-triage-agent.git
+
+# Windows (required for long SIGMA rule paths under mcp_server/sigma_rules/)
+git clone -c core.longpaths=true https://github.com/FAAS19/autonomous-dfir-triage-agent.git
+
 cd autonomous-dfir-triage-agent
 ```
 
@@ -317,7 +321,7 @@ Outputs `outputs/dfir_triage_report.md` and `outputs/provenance.jsonl`.
 uv run pytest
 ```
 
-All 6 tests (integration + unit) should pass. For ADK evaluation:
+Runs the 5 integration tests in `tests/integration/` (`test_agent.py` and `test_server_e2e.py`). For ADK evaluation:
 
 ```bash
 uv run python tests/eval/run_local_eval.py
